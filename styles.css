@@ -1,0 +1,63 @@
+div {
+  /*background-color: #ffff00;*/
+  width: auto;
+  border: auto solid green;
+  padding: auto;
+  margin: auto;
+}
+body {
+  height: 100vh;
+  margin: 0;
+  padding: 1rem;
+  display: grid;
+  place-items: center;
+  font-family: system-ui;
+}
+h1 {
+  background: white;
+  padding: 1rem 2rem;
+  text-align: center;
+}
+h2.headertekst {
+  front-color: white;
+  text-align: center;
+}
+p {text-align: center;}
+span {
+  display: block;
+  padding: 1rem;
+  font-size: 1rem;
+  font-weight: normal;
+  font-family: monospace;
+}
+input.MyButton {
+  display: block;
+  width: 150px;
+  padding: 10px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 60%;
+  background: rgba(34,193,195,1);
+  color: #000;
+  border: 1px solid rgba(253,187,45,1);
+  border-radius: 5px;
+  margin-right: auto;
+  margin-left: auto;
+  -moz-box-shadow:: 6px 6px 5px #999;
+  -webkit-box-shadow:: 6px 6px 5px #999;
+  box-shadow:: 6px 6px 5px #999;
+}
+input.MyButton:hover {
+  color: #000;
+  background: radial-gradient(circle, rgba(34,193,195,1) 90%, rgba(253,187,45,1) 10%);
+  border: 1px solid rgba(253,187,45,1);
+}
+.center {
+  margin-left: auto;
+  margin-right: auto;
+}
+.center-block {
+  display: block;
+  margin-right: auto;
+  margin-left: auto;
+}
