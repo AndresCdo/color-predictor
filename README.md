@@ -1,2 +1,3 @@
-# colors_html_tf
-A little webpage that lerns your favorites colors.
+# **Color Precitor**
+
+A little *HTML* webpage that lerns whitch are your favorites colors.
