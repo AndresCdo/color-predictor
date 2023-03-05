@@ -8,10 +8,10 @@ function setBackgraundColor(){
 function saveOrNotColorChoosen(choosen){
   if(randomColor){
     if(choosen){
-      colorChoosen.push("#" + randomColor);
+      colorsChoosen.push("#" + randomColor);
       setBackgraundColor();
     }else{
-      colorNotChoosen.push("#" + randomColor);
+      colorsNotChoosen.push("#" + randomColor);
       setBackgraundColor();
       }
     }else{setBackgraundColor();}
