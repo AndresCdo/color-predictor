@@ -61,3 +61,7 @@ input.MyButton:hover {
   margin-right: auto;
   margin-left: auto;
 }
+
+.background{
+  background: radial-gradient(circle, rgba(34,193,195,1) 0%, rgba(253,187,45,1) 100%);
+}
