@@ -5,13 +5,12 @@
     <!-- Load TensorFlow.js -->
     <!-- Get lastest version at https://github.com/tensorflow/tfjs -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@0.11"></script>
-    <script src="tf.js"></script>
+    <!-- script src="tf.js"></script -->
     <script src="main.js"></script>
     <link href="styles.css" rel="stylesheet" type="text/css">
-    <title></title>
+    <title>Color Predictor</title>
     </head>
-  <body>
-    <script>setBackgraundColor();</script>
+  <body onload="javascript:setBackgroundColor()">
     <h1>Demonstrating the Box Model</h1>
     <p>The CSS box model is essentially a box that wraps around every HTML element.
        It consists of: borders, padding, margins, and the actual content.</p>
@@ -21,13 +20,13 @@
           	<tr>
               <td>
                 <h1>
-                  <button id="yea" onClick="saveOrNotColorChoosen(true, document.body.style.backgroundColor)">Yea</button>
+                  <button id="yea" onClick="saveOrNotColorChoosen(true)">Yea</button>
                 </h1>
               </td>
 
               <td>
                 <h1>
-                  <button id="nay" onClick="saveOrNotColorChoosen(false, document.body.style.backgroundColor)">Nay</button>
+                  <button id="nay" onClick="saveOrNotColorChoosen(false)">Nay</button>
                 </h1>
               </td>
               </tr>
