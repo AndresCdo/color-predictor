@@ -1,18 +1,11 @@
-let randomColor;
+const colors = [];
 
-function setBackgraundColor(){
-  randomColor =  Math.floor(Math.random()*16777215).toString(16);
+function setBackgroundColor() {
+  const randomColor = Math.floor(Math.random() * 16777215).toString(16);
   document.body.style.backgroundColor = "#" + randomColor;
 }
 
-function saveOrNotColorChoosen(choosen){
-  if(randomColor){
-    if(choosen){
-      colorsChoosen.push("#" + randomColor);
-      setBackgraundColor();
-    }else{
-      colorsNotChoosen.push("#" + randomColor);
-      setBackgraundColor();
-      }
-    }else{setBackgraundColor();}
-  }
+function saveOrNotColorChoosen(choosen) {
+  colors.push({ color: document.body.style.backgroundColor, choosen });
+  setBackgroundColor();
+}
