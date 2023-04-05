@@ -43,9 +43,9 @@ input.MyButton {
   border-radius: 5px;
   margin-right: auto;
   margin-left: auto;
-  -moz-box-shadow:: 6px 6px 5px #999;
-  -webkit-box-shadow:: 6px 6px 5px #999;
-  box-shadow:: 6px 6px 5px #999;
+  -moz-box-shadow: 6px 6px 5px #999;
+  -webkit-box-shadow: 6px 6px 5px #999;
+  box-shadow: 6px 6px 5px #999;
 }
 input.MyButton:hover {
   color: #000;
