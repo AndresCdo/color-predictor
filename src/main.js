@@ -1,11 +1,17 @@
 const colors = [];
 
 function setBackgroundColor() {
-  const randomColor = Math.floor(Math.random() * 16777215).toString(16);
-  document.body.style.backgroundColor = "#" + randomColor;
+  const randomColor = getRandomColor();
+  document.body.style.backgroundColor = randomColor;
 }
 
-function saveOrNotColorChoosen(choosen) {
-  colors.push({ color: document.body.style.backgroundColor, choosen });
+function saveColorChoice(isChosen) {
+  const currentColor = document.body.style.backgroundColor;
+  colors.push({ color: currentColor, isChosen });
   setBackgroundColor();
+}
+
+function getRandomColor() {
+  const randomColor = Math.floor(Math.random() * 16777215).toString(16);
+  return "#" + randomColor;
 }
