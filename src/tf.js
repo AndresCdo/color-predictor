@@ -1,5 +1,5 @@
-let colorChoosen = [];
-let colorNotChoosen = [];
+let colorsChoosen = [];
+let colorsNotChoosen = [];
 
 async function learnLinear() {
   const model = tf.sequential();
