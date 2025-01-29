@@ -1,1 +1,9 @@
 .git
+node_modules
+.next
+out
+public
+.env
+.DS_Store
+yarn-error.log
+
