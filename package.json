@@ -1,0 +1,19 @@
+{
+  "name": "color-predictor",
+  "version": "0.1.0",
+  "description": "A simple web application that learns your favorite colors.",
+  "main": "main.js",
+  "scripts": {
+    "start": "node tf.js",
+    "build": "webpack"
+  },
+  "keywords": ["colors", "predictor", "tfjs"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@tensorflow/tfjs": "^3.10.1",
+    "express": "^4.17.1",
+    "fs": "0.0.1-security",
+    "path": "^0.12.7"
+  }
+}

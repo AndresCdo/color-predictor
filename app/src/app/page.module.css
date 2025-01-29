@@ -1,0 +1,30 @@
+.local-div {
+  /*background-color: #ffff00;*/
+  border: auto solid green;
+}
+
+.local-body {
+  height: 100vh;
+  padding: 1rem;
+  display: grid;
+  place-items: center;
+  font-family: system-ui;
+}
+
+.local-p {
+  text-align: center;
+}
+
+.local-span {
+  display: block;
+  font-weight: normal;
+  font-family: monospace;
+}
+
+.center-block {
+  display: block;
+}
+
+.background {
+  background: radial-gradient(circle, rgba(34, 193, 195, 1) 0%, rgba(253, 187, 45, 1) 100%);
+}
