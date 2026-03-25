@@ -1,30 +1,762 @@
-.local-div {
-  /*background-color: #ffff00;*/
-  border: auto solid green;
+/* ═══════════════════════════════════════════════════════════════
+   Page – Premium Layout & Component Styles
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Page Container ─────────────────────────────────────────── */
+.pageContainer {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--space-xl) var(--space-md) var(--space-3xl);
 }
 
-.local-body {
-  height: 100vh;
-  padding: 1rem;
+@media (min-width: 640px) {
+  .pageContainer {
+    padding: var(--space-3xl) var(--space-lg) calc(var(--space-3xl) * 1.5);
+  }
+}
+
+/* ── Hero Section ───────────────────────────────────────────── */
+.hero {
+  text-align: center;
+  margin-bottom: var(--space-2xl);
+  animation: fade-in-up var(--duration-slow) var(--ease-out) both;
+}
+
+.heroIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--accent), #a855f7);
+  color: white;
+  font-size: 28px;
+  margin-bottom: var(--space-lg);
+  box-shadow:
+    0 8px 32px rgba(99, 102, 241, 0.25),
+    0 0 0 1px rgba(99, 102, 241, 0.1);
+  animation: scale-in 0.6s var(--ease-spring) 0.1s both;
+}
+
+.heroTitle {
+  font-size: clamp(28px, 5vw, 42px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: var(--text);
+  margin-bottom: var(--space-sm);
+  background: linear-gradient(135deg, var(--text) 40%, var(--accent));
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.heroSubtitle {
+  font-size: clamp(14px, 2vw, 17px);
+  color: var(--text-muted);
+  line-height: 1.6;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+/* ── Glass Card ─────────────────────────────────────────────── */
+.card {
+  position: relative;
+  background: var(--surface);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  margin-bottom: var(--space-lg);
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color var(--duration-normal) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-out),
+    transform var(--duration-normal) var(--ease-out);
+  animation: fade-in-up var(--duration-slow) var(--ease-out) both;
+}
+
+.card:nth-child(2) { animation-delay: 0.08s; }
+.card:nth-child(3) { animation-delay: 0.16s; }
+.card:nth-child(4) { animation-delay: 0.24s; }
+.card:nth-child(5) { animation-delay: 0.32s; }
+
+.card:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-md), var(--shadow-glow);
+  transform: translateY(-2px);
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: var(--space-lg) var(--space-md);
+    border-radius: var(--radius-md);
+  }
+}
+
+/* ── Step Header ────────────────────────────────────────────── */
+.stepHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.stepBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  font-size: 14px;
+  font-weight: 700;
+  color: white;
+  background: linear-gradient(135deg, var(--accent), #a855f7);
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+.stepTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+/* ── Summary Bar ────────────────────────────────────────────── */
+.summaryCard {
+  composes: card;
+  padding: var(--space-lg);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+  animation-delay: 0s;
+}
+
+.summaryChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  flex: 1;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.chipSuccess {
+  composes: chip;
+  border-color: var(--success);
+  color: var(--success);
+  background: var(--success-light);
+}
+
+.chipDanger {
+  composes: chip;
+  border-color: var(--danger);
+  color: var(--danger);
+  background: var(--danger-light);
+}
+
+.chipAccent {
+  composes: chip;
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-glow);
+}
+
+/* ── Action Buttons ─────────────────────────────────────────── */
+.buttonRow {
   display: grid;
-  place-items: center;
-  font-family: system-ui;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  margin-top: var(--space-lg);
 }
 
-.local-p {
+@media (max-width: 480px) {
+  .buttonRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: 14px var(--space-lg);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-spring),
+    box-shadow var(--duration-fast) var(--ease-out);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.3);
+}
+
+.btnLike {
+  composes: btn;
+  background: var(--success);
+  color: white;
+  box-shadow: 0 4px 16px var(--success-glow);
+}
+.btnLike:hover:not(:disabled) {
+  background: #059669;
+  box-shadow: 0 8px 24px var(--success-glow);
+}
+
+.btnDislike {
+  composes: btn;
+  background: transparent;
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.btnDislike:hover:not(:disabled) {
+  background: var(--danger-light);
+  box-shadow: 0 4px 16px var(--danger-glow);
+}
+
+.btnTrain {
+  composes: btn;
+  background: linear-gradient(135deg, var(--accent), #a855f7);
+  color: white;
+  box-shadow: 0 4px 16px var(--accent-glow);
+}
+.btnTrain:hover:not(:disabled) {
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.3);
+}
+
+.btnPredict {
+  composes: btn;
+  background: transparent;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.btnPredict:hover:not(:disabled) {
+  background: var(--accent-glow);
+  box-shadow: 0 4px 16px var(--accent-glow);
+}
+
+/* ── Icon inside buttons ────────────────────────────────────── */
+.btnIcon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+/* ── Text Button (Undo / Clear) ─────────────────────────────── */
+.textBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
+}
+
+.textBtn:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--accent-glow);
+}
+
+.textBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Rating Chips ───────────────────────────────────────────── */
+.ratingRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+}
+
+.ratingLabel {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  margin-right: var(--space-xs);
+}
+
+.ratingChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  animation: scale-in var(--duration-normal) var(--ease-spring);
+}
+
+.ratingChipLike {
+  composes: ratingChip;
+  color: var(--success);
+  border-color: var(--success);
+  background: var(--success-light);
+}
+
+.ratingChipDislike {
+  composes: ratingChip;
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--danger-light);
+}
+
+.ratingDot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  display: inline-block;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* ── Training Stats Row ─────────────────────────────────────── */
+.statsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+/* ── Progress Bar ───────────────────────────────────────────── */
+.progressWrap {
+  margin-top: var(--space-md);
+  animation: fade-in var(--duration-normal) var(--ease-out);
+}
+
+.progressBar {
+  width: 100%;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--border);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--accent), #a855f7);
+  animation: shimmer 1.8s ease infinite;
+  background-size: 200% 100%;
+}
+
+.progressText {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-faint);
   text-align: center;
 }
 
-.local-span {
-  display: block;
-  font-weight: normal;
-  font-family: monospace;
+/* ── Prediction Result ──────────────────────────────────────── */
+.predictionCard {
+  composes: card;
+  overflow: hidden;
+  animation: scale-in var(--duration-slow) var(--ease-spring) both;
 }
 
-.center-block {
-  display: block;
+.predictionInner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
 }
 
-.background {
-  background: radial-gradient(circle, rgba(34, 193, 195, 1) 0%, rgba(253, 187, 45, 1) 100%);
+@media (max-width: 480px) {
+  .predictionInner {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+
+.predictionSwatch {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--border);
+  flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
+  transition: background-color var(--duration-slow) var(--ease-out);
+}
+
+.predictionBody {
+  flex: 1;
+}
+
+.predictionVerdict {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.predictionMeta {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin-bottom: var(--space-md);
+}
+
+.confidenceBar {
+  width: 100%;
+  max-width: 320px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--border);
+  overflow: hidden;
+}
+
+.confidenceFill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.8s var(--ease-out);
+}
+
+.confidenceFillLike {
+  composes: confidenceFill;
+  background: linear-gradient(90deg, var(--success), #34d399);
+}
+
+.confidenceFillDislike {
+  composes: confidenceFill;
+  background: linear-gradient(90deg, var(--danger), #f87171);
+}
+
+/* ── Shortcut Badge ─────────────────────────────────────────── */
+.shortcutRow {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+  margin-top: var(--space-sm);
+}
+
+.shortcutBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  box-shadow: 0 1px 0 var(--border);
+}
+
+/* ── Disclaimer ─────────────────────────────────────────────── */
+.disclaimer {
+  font-size: 12px;
+  color: var(--text-faint);
+  text-align: center;
+  margin-top: var(--space-md);
+}
+
+/* ── Onboarding Alert ───────────────────────────────────────── */
+.alertBox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  margin-bottom: var(--space-lg);
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.55;
+  animation: fade-in-up var(--duration-slow) var(--ease-out);
+}
+
+.alertInfo {
+  composes: alertBox;
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.alertError {
+  composes: alertBox;
+  border-color: var(--danger);
+  background: var(--danger-light);
+  color: var(--danger);
+}
+
+.alertCloseBtn {
+  margin-left: auto;
+  padding: 2px;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.alertCloseBtn:hover {
+  color: var(--text);
+}
+
+/* ── Snackbar / Toast ───────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: var(--space-lg);
+  left: 50%;
+  transform: translateX(-50%) translateY(120%);
+  padding: 12px var(--space-lg);
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    transform var(--duration-normal) var(--ease-spring),
+    opacity var(--duration-fast) var(--ease-out);
+  white-space: nowrap;
+}
+
+.toastVisible {
+  composes: toast;
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.toastSuccess {
+  background: var(--success);
+}
+
+.toastError {
+  background: var(--danger);
+}
+
+.toastInfo {
+  background: var(--accent);
+}
+
+/* ── Loading Screen ─────────────────────────────────────────── */
+.loadingScreen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  gap: var(--space-lg);
+  animation: fade-in var(--duration-slow) var(--ease-out);
+}
+
+.loadingSpinner {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loadingText {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* ── Confirm Dialog Overlay ─────────────────────────────────── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fade-in var(--duration-fast) var(--ease-out);
+}
+
+.dialog {
+  width: 90%;
+  max-width: 420px;
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  box-shadow: var(--shadow-lg);
+  animation: scale-in var(--duration-normal) var(--ease-spring);
+}
+
+.dialogTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: var(--space-sm);
+}
+
+.dialogBody {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: var(--space-xl);
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+.dialogCancelBtn {
+  composes: btn;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  padding: 10px 20px;
+  font-size: 14px;
+}
+
+.dialogCancelBtn:hover {
+  background: var(--surface);
+}
+
+.dialogDangerBtn {
+  composes: btn;
+  background: var(--danger);
+  color: white;
+  padding: 10px 20px;
+  font-size: 14px;
+  box-shadow: 0 4px 12px var(--danger-glow);
+}
+
+.dialogDangerBtn:hover:not(:disabled) {
+  background: #dc2626;
+  box-shadow: 0 8px 20px var(--danger-glow);
+}
+
+/* ── SR Only ────────────────────────────────────────────────── */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Footer Text ────────────────────────────────────────────── */
+.footer {
+  text-align: center;
+  margin-top: var(--space-2xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--border);
+  animation: fade-in var(--duration-slow) var(--ease-out) 0.4s both;
+}
+
+.footerText {
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.6;
+}
+
+/* ── Inline SVG Icon Utilities ──────────────────────────────── */
+
+/* Small icon inside chips — vertically aligned with text */
+.chipIconInline {
+  display: inline-block;
+  vertical-align: -2px;
+  flex-shrink: 0;
+}
+
+/* Icon leading an alert banner */
+.alertIcon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Icon inside prediction verdict text */
+.verdictIcon {
+  display: inline-block;
+  vertical-align: -3px;
+  margin-right: 4px;
+  flex-shrink: 0;
 }
