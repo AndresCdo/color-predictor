@@ -50,7 +50,7 @@ export const createModel = ({ learningRate = 0.001, dropout = 0.2 } = {}) => {
   model.add(tf.layers.activation({ activation: 'relu' }));
   model.add(tf.layers.dropout({ rate: dropout }));
   
-  // Hidden layer with residual connection
+  // Hidden layer
   model.add(tf.layers.dense({
     units: 16,
     kernelInitializer: 'glorotNormal'
@@ -70,7 +70,7 @@ export const createModel = ({ learningRate = 0.001, dropout = 0.2 } = {}) => {
   model.compile({
     loss: 'binaryCrossentropy',
     optimizer,
-    metrics: ['accuracy', 'precision']
+    metrics: ['accuracy']
   });
   
   return model;
@@ -182,9 +182,10 @@ export const predictColor = (model, color) => {
   }
   
   const input = tf.tensor2d([rgb]);
+  let prediction;
   
   try {
-    const prediction = model.predict(input);
+    prediction = model.predict(input);
     const score = prediction.dataSync()[0];
     
     // Calculate confidence based on distance from decision boundary
@@ -197,6 +198,9 @@ export const predictColor = (model, color) => {
       prediction: score > 0.5 ? 'like' : 'dislike'
     };
   } finally {
+    if (prediction) {
+      prediction.dispose();
+    }
     input.dispose();
   }
 };
