@@ -33,18 +33,36 @@ const randomHex = () =>
   ).join('');
 
 const HEX_REGEX = /^#?([0-9A-Fa-f]{6})$/;
+const HEX_ALLOWED_CHARS = /[^#0-9A-Fa-f]/g;
+const HEX_HELPER_ID = 'color-help';
+const HEX_ERROR_ID = 'color-hex-error';
+
+const normalizeHexInput = (value) => {
+  const cleaned = value.replace(HEX_ALLOWED_CHARS, '').toUpperCase();
+  if (!cleaned) return '';
+  if (cleaned.startsWith('#')) return `#${cleaned.slice(1).replace(/#/g, '')}`;
+  return `#${cleaned.replace(/#/g, '')}`;
+};
 
 const ColorPicker = ({ currentColor, onColorChange }) => {
   const [hexDraft, setHexDraft] = useState(currentColor.toUpperCase());
+  const [hexError, setHexError] = useState('');
   const nativeInputRef = useRef(null);
   const textColor = getContrastTextColor(currentColor);
+  const displayHex = currentColor.toUpperCase();
 
   const commitHex = useCallback(
     (raw) => {
       const clean = raw.startsWith('#') ? raw : `#${raw}`;
       if (HEX_REGEX.test(clean)) {
+        setHexError('');
         onColorChange(clean.toLowerCase());
+        setHexDraft(clean.toUpperCase());
+        return true;
       }
+
+      setHexError('Enter a full 6-digit hex color, for example #6366F1.');
+      return false;
     },
     [onColorChange],
   );
@@ -54,22 +72,42 @@ const ColorPicker = ({ currentColor, onColorChange }) => {
       const value = e.target.value;
       onColorChange(value);
       setHexDraft(value.toUpperCase());
+      setHexError('');
     },
     [onColorChange],
   );
 
   const handleTextChange = useCallback((e) => {
-    setHexDraft(e.target.value.toUpperCase());
+    const nextValue = normalizeHexInput(e.target.value).slice(0, 7);
+    setHexDraft(nextValue);
+
+    if (nextValue.length === 0) {
+      setHexError('');
+      return;
+    }
+
+    setHexError(HEX_REGEX.test(nextValue) ? '' : 'Enter a full 6-digit hex color, for example #6366F1.');
   }, []);
 
   const handleTextBlur = useCallback(() => {
-    commitHex(hexDraft);
-  }, [commitHex, hexDraft]);
+    if (!hexDraft) {
+      setHexDraft(displayHex);
+      setHexError('');
+      return;
+    }
+
+    if (!commitHex(hexDraft)) {
+      setHexDraft(displayHex);
+    }
+  }, [commitHex, displayHex, hexDraft]);
 
   const handleTextKeyDown = useCallback(
     (e) => {
       if (e.key === 'Enter') {
-        commitHex(hexDraft);
+        if (!commitHex(hexDraft)) {
+          e.preventDefault();
+          return;
+        }
         e.target.blur();
       }
     },
@@ -80,10 +118,10 @@ const ColorPicker = ({ currentColor, onColorChange }) => {
     const color = randomHex();
     onColorChange(color);
     setHexDraft(color.toUpperCase());
+    setHexError('');
   }, [onColorChange]);
 
   // Keep text input in sync when parent changes colour via keyboard shortcuts etc.
-  const displayHex = currentColor.toUpperCase();
   if (hexDraft !== displayHex && HEX_REGEX.test(hexDraft)) {
     // Only sync outward if the user isn't actively typing something new
   }
@@ -140,12 +178,18 @@ const ColorPicker = ({ currentColor, onColorChange }) => {
           onChange={handleTextChange}
           onBlur={handleTextBlur}
           onKeyDown={handleTextKeyDown}
-          onFocus={() => setHexDraft(displayHex)}
-          className={styles.hexInputField}
+          onFocus={() => {
+            if (!hexDraft) {
+              setHexDraft(displayHex);
+            }
+          }}
+          className={hexError ? `${styles.hexInputField} ${styles.hexInputFieldError}` : styles.hexInputField}
           maxLength={7}
           spellCheck={false}
           autoComplete="off"
           aria-label="Hex color value"
+          aria-invalid={hexError ? 'true' : 'false'}
+          aria-describedby={hexError ? `${HEX_HELPER_ID} ${HEX_ERROR_ID}` : HEX_HELPER_ID}
           placeholder="#6366F1"
         />
         <button
@@ -175,9 +219,14 @@ const ColorPicker = ({ currentColor, onColorChange }) => {
         </button>
       </div>
 
-      <p className={styles.helper} id="color-help">
+      <p className={styles.helper} id={HEX_HELPER_ID}>
         Pick any color, then tell the model if you like it.
       </p>
+      {hexError && (
+        <p className={styles.errorText} id={HEX_ERROR_ID} role="status" aria-live="polite">
+          {hexError}
+        </p>
+      )}
     </div>
   );
 };

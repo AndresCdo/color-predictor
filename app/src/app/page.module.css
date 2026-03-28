@@ -126,6 +126,49 @@
   letter-spacing: -0.01em;
 }
 
+.learnMore {
+  margin: calc(var(--space-lg) * -0.25) 0 var(--space-lg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.learnMoreSummary {
+  cursor: pointer;
+  list-style: none;
+  padding: 12px var(--space-md);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.learnMoreSummary::-webkit-details-marker {
+  display: none;
+}
+
+.learnMoreSummary::after {
+  content: '+';
+  float: right;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.learnMore[open] .learnMoreSummary::after {
+  content: '−';
+}
+
+.learnMoreBody {
+  padding: 0 var(--space-md) var(--space-md);
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.learnMoreBody p + p {
+  margin-top: var(--space-sm);
+}
+
 /* ── Summary Bar ────────────────────────────────────────────── */
 .summaryCard {
   composes: card;
@@ -142,6 +185,130 @@
   flex-wrap: wrap;
   gap: var(--space-sm);
   flex: 1;
+}
+
+.summaryContent {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.summaryStatus {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.summaryLabel {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.summaryTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.summaryDescription {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.shortcutHelp {
+  margin-top: var(--space-xs);
+}
+
+.shortcutHelpSummary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.shortcutHelpSummary::-webkit-details-marker {
+  display: none;
+}
+
+.shortcutHelpSummary::after {
+  content: '+';
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-faint);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.shortcutHelp[open] .shortcutHelpSummary::after {
+  transform: rotate(45deg);
+}
+
+.shortcutHelpBody {
+  margin-top: var(--space-sm);
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.shortcutHelpList {
+  margin-top: var(--space-sm);
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.themeToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 14px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-spring);
+}
+
+.themeToggle:hover {
+  color: var(--text);
+  border-color: var(--border-hover);
+  background: var(--accent-glow);
+  transform: translateY(-1px);
+}
+
+.themeToggle:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.themeToggleIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.themeToggleText {
+  white-space: nowrap;
 }
 
 .chip {
@@ -164,14 +331,14 @@
 .chipSuccess {
   composes: chip;
   border-color: var(--success);
-  color: var(--success);
+  color: var(--success-text);
   background: var(--success-light);
 }
 
 .chipDanger {
   composes: chip;
   border-color: var(--danger);
-  color: var(--danger);
+  color: var(--danger-text);
   background: var(--danger-light);
 }
 
@@ -289,7 +456,9 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 12px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 16px;
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 600;
@@ -333,6 +502,18 @@
   margin-right: var(--space-xs);
 }
 
+.currentRatingHint {
+  margin-top: var(--space-md);
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.55;
+}
+
+.currentRatingHint strong {
+  color: var(--text);
+}
+
 .ratingChip {
   display: inline-flex;
   align-items: center;
@@ -348,14 +529,14 @@
 
 .ratingChipLike {
   composes: ratingChip;
-  color: var(--success);
+  color: var(--success-text);
   border-color: var(--success);
   background: var(--success-light);
 }
 
 .ratingChipDislike {
   composes: ratingChip;
-  color: var(--danger);
+  color: var(--danger-text);
   border-color: var(--danger);
   background: var(--danger-light);
 }
@@ -375,6 +556,53 @@
   flex-wrap: wrap;
   gap: var(--space-sm);
   margin-bottom: var(--space-md);
+}
+
+.trainingGuidance {
+  display: flex;
+  gap: var(--space-md);
+  align-items: flex-start;
+  margin-bottom: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.trainingGuidanceNeutral {
+  composes: trainingGuidance;
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.trainingGuidanceAccent {
+  composes: trainingGuidance;
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.trainingGuidanceIcon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--accent);
+}
+
+.trainingGuidanceTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.trainingGuidanceText {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.trainingMeta {
+  margin-bottom: var(--space-md);
+  font-size: 13px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
 }
 
 /* ── Progress Bar ───────────────────────────────────────────── */
@@ -404,6 +632,38 @@
   font-size: 12px;
   color: var(--text-faint);
   text-align: center;
+}
+
+.trainingCelebration {
+  display: flex;
+  gap: var(--space-md);
+  align-items: flex-start;
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--success);
+  background: var(--success-light);
+  color: var(--success-text);
+  box-shadow: 0 0 0 1px var(--success-glow), var(--shadow-sm);
+  animation: scale-in var(--duration-normal) var(--ease-spring);
+}
+
+.trainingCelebrationIcon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.trainingCelebrationTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--success-text);
+}
+
+.trainingCelebrationText {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--success-text);
 }
 
 /* ── Prediction Result ──────────────────────────────────────── */
@@ -450,8 +710,33 @@
 .predictionMeta {
   font-size: 13px;
   color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: var(--space-sm);
+}
+
+.predictionStats {
+  font-size: 13px;
+  color: var(--text-muted);
   font-family: var(--font-mono);
   margin-bottom: var(--space-md);
+}
+
+.predictionLoadingBar {
+  width: 100%;
+  max-width: 320px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--border);
+  overflow: hidden;
+}
+
+.predictionLoadingFill {
+  width: 35%;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--accent), #a855f7);
+  animation: shimmer 1.4s ease infinite;
+  background-size: 200% 100%;
 }
 
 .confidenceBar {
@@ -552,7 +837,12 @@
 
 .alertCloseBtn {
   margin-left: auto;
-  padding: 2px;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
   background: none;
   border: none;
   color: var(--text-faint);
@@ -566,6 +856,11 @@
 
 .alertCloseBtn:hover {
   color: var(--text);
+}
+
+.alertCloseBtn:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }
 
 /* ── Snackbar / Toast ───────────────────────────────────────── */
@@ -583,10 +878,21 @@
   z-index: 9999;
   pointer-events: none;
   opacity: 0;
+  box-sizing: border-box;
   transition:
     transform var(--duration-normal) var(--ease-spring),
     opacity var(--duration-fast) var(--ease-out);
   white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .toast {
+    width: min(calc(100vw - (var(--space-md) * 2)), 420px);
+    max-width: calc(100vw - (var(--space-md) * 2));
+    bottom: calc(var(--space-lg) + env(safe-area-inset-bottom, 0px));
+    white-space: normal;
+    text-align: center;
+  }
 }
 
 .toastVisible {
