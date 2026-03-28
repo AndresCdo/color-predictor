@@ -125,6 +125,7 @@ const preprocessData = (selectedColors, unselectedColors) => {
  * @param {number} [config.epochs=50] - Number of training epochs.
  * @param {number} [config.batchSize=32] - Batch size for training.
  * @param {number} [config.validationSplit=0.2] - Fraction of data to use for validation.
+ * @param {(epoch: number, logs?: tf.Logs) => void} [config.onEpochEnd] - Optional callback fired after each epoch.
  * @returns {Promise<tf.History>} A promise that resolves with the training history.
  * @throws {Error} If training fails or input data is invalid.
  */
@@ -132,7 +133,7 @@ export const trainModel = async (
   model,
   selectedColors,
   unselectedColors,
-  { epochs = 50, batchSize = 32, validationSplit = 0.2 } = {}
+  { epochs = 50, batchSize = 32, validationSplit = 0.2, onEpochEnd } = {}
 ) => {
   let tensors;
   
@@ -146,13 +147,18 @@ export const trainModel = async (
       patience: 5,
       mode: 'min'
     });
+
+    const callbacks = [earlyStoppingCallback];
+    if (typeof onEpochEnd === 'function') {
+      callbacks.push({ onEpochEnd });
+    }
     
     const history = await model.fit(tensors.xs, tensors.ys, {
       epochs,
       batchSize,
       validationSplit,
       shuffle: true,
-      callbacks: [earlyStoppingCallback],
+      callbacks,
       verbose: 1
     });
     

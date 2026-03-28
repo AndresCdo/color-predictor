@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import * as tf from '@tensorflow/tfjs';
 import {
   createModel,
+  hexToRgb,
   trainModel,
   predictColor,
   saveModel,
@@ -16,6 +17,19 @@ import s from './page.module.css';
 const MODEL_ID = 'color-predictor-v1';
 const ONBOARDING_KEY = 'color-predictor-onboarding-dismissed-v1';
 const SESSION_KEY = 'color-predictor-session-state-v1';
+const THEME_KEY = 'color-predictor-theme-preference-v1';
+const MIN_RATINGS_PER_CLASS = 2;
+const TRAINING_EPOCHS = 50;
+const TRAINING_BATCH_SIZE = 32;
+
+const getTrainingUnlockLabel = () => `${MIN_RATINGS_PER_CLASS} liked and ${MIN_RATINGS_PER_CLASS} disliked colors`;
+
+const getDefaultModelStats = () => ({
+  trainedSamples: 0,
+  accuracy: null,
+  lastTrained: null,
+  trainedDatasetSignature: null,
+});
 
 /* ── Helpers ────────────────────────────────────────────────── */
 const safeParse = (raw, fallback) => {
@@ -36,6 +50,239 @@ const removeLastMatch = (items, value) => {
   const idx = copy.lastIndexOf(value);
   if (idx >= 0) copy.splice(idx, 1);
   return copy;
+};
+
+const addIfMissing = (items, value) => (items.includes(value) ? items : [...items, value]);
+
+const getColorRating = (selectedItems, unselectedItems, color) => {
+  if (selectedItems.includes(color)) return 'liked';
+  if (unselectedItems.includes(color)) return 'disliked';
+  return null;
+};
+
+const getAccuracyFeedback = (accuracyValue) => {
+  const accuracy = Number.parseFloat(accuracyValue);
+
+  if (!Number.isFinite(accuracy)) return null;
+  if (accuracy >= 90) return 'Excellent fit';
+  if (accuracy >= 75) return 'Learning your taste well';
+  if (accuracy >= 60) return 'Promising start';
+  return 'Needs more ratings';
+};
+
+const getPredictionConfidenceLabel = (confidence) => {
+  if (confidence >= 0.85) return 'Very confident';
+  if (confidence >= 0.65) return 'Fairly confident';
+  if (confidence >= 0.45) return 'Still learning';
+  return 'Low confidence';
+};
+
+const getPredictionExplanation = (prediction) => {
+  if (!prediction) return '';
+
+  const confidenceLabel = getPredictionConfidenceLabel(prediction.confidence);
+
+  if (prediction.prediction === 'like') {
+    return `${confidenceLabel} — the model sees this color as similar to shades you have liked before.`;
+  }
+
+  return `${confidenceLabel} — the model sees this color as closer to shades you have disliked before.`;
+};
+
+const getNextThemePreference = (currentPreference) => {
+  if (currentPreference === 'system') return 'light';
+  if (currentPreference === 'light') return 'dark';
+  return 'system';
+};
+
+const getThemeButtonLabel = (themePreference) => {
+  if (themePreference === 'system') return 'Theme: System';
+  if (themePreference === 'light') return 'Theme: Light';
+  return 'Theme: Dark';
+};
+
+const getErrorMessage = (error) => (error instanceof Error ? error.message : String(error || ''));
+
+const createDatasetSignature = (selectedItems, unselectedItems) => JSON.stringify({
+  selected: selectedItems
+    .filter((item) => typeof item === 'string' && hexToRgb(item))
+    .map((item) => item.toLowerCase())
+    .sort(),
+  unselected: unselectedItems
+    .filter((item) => typeof item === 'string' && hexToRgb(item))
+    .map((item) => item.toLowerCase())
+    .sort(),
+});
+
+const sanitizeModelStats = (value) => {
+  const defaults = getDefaultModelStats();
+
+  if (!value || typeof value !== 'object') {
+    return defaults;
+  }
+
+  const trainedSamples = Number(value.trainedSamples);
+  const accuracyValue = value.accuracy === null || value.accuracy === undefined
+    ? null
+    : Number.parseFloat(value.accuracy);
+
+  return {
+    trainedSamples: Number.isFinite(trainedSamples) && trainedSamples >= 0 ? trainedSamples : defaults.trainedSamples,
+    accuracy: Number.isFinite(accuracyValue) ? accuracyValue.toFixed(1) : defaults.accuracy,
+    lastTrained: typeof value.lastTrained === 'string' && value.lastTrained ? value.lastTrained : defaults.lastTrained,
+    trainedDatasetSignature:
+      typeof value.trainedDatasetSignature === 'string' && value.trainedDatasetSignature
+        ? value.trainedDatasetSignature
+        : defaults.trainedDatasetSignature,
+  };
+};
+
+const getInitializationErrorMessage = () => (
+  'We could not prepare the model right now. Refresh the page to try again.'
+);
+
+const getTrainingErrorMessage = (error) => {
+  const message = getErrorMessage(error).toLowerCase();
+
+  if (message.includes('selected and unselected') || message.includes('contain data')) {
+    return `Add more rated colors before training. In this app, training unlocks once you have at least ${getTrainingUnlockLabel()}.`;
+  }
+
+  if (message.includes('no valid colors')) {
+    return 'Your saved ratings could not be read. Clear the session and rate a few colors again.';
+  }
+
+  if (message.includes('indexeddb') || message.includes('save model')) {
+    return 'Training finished, but the model could not be saved on this device. Try again or keep using the session without saving.';
+  }
+
+  return 'Training could not finish this time. Try rating a few more colors and run training again.';
+};
+
+const getPredictionErrorMessage = (error) => {
+  const message = getErrorMessage(error).toLowerCase();
+
+  if (message.includes('invalid color format')) {
+    return 'Pick a valid color before asking for a prediction.';
+  }
+
+  return 'The model could not make a prediction right now. Try a different color or train the model again.';
+};
+
+const getModelStatus = ({ model, status, modelStats, stats, hasTrainedModel }) => {
+  if (status.isLoading) {
+    return {
+      label: 'Model loading',
+      detail: 'Preparing the in-browser neural network.',
+      tone: 'neutral',
+      ready: false,
+    };
+  }
+
+  if (!model) {
+    return {
+      label: 'Model unavailable',
+      detail: 'Refresh the page to try initializing it again.',
+      tone: 'danger',
+      ready: false,
+    };
+  }
+
+  if (status.isTraining) {
+    return {
+      label: 'Training in progress',
+      detail: `Learning from ${stats.totalSamples} rated colors.`,
+      tone: 'accent',
+      ready: false,
+    };
+  }
+
+  if (status.isPredicting) {
+    return {
+      label: 'Analyzing color',
+      detail: 'Generating a prediction for the current shade.',
+      tone: 'accent',
+      ready: false,
+    };
+  }
+
+  if (modelStats.lastTrained && !hasTrainedModel) {
+    return {
+      label: 'Saved model unavailable',
+      detail: 'Training details were restored, but the saved model could not be loaded on this device. Train again to enable predictions.',
+      tone: 'danger',
+      ready: false,
+    };
+  }
+
+  if (hasTrainedModel) {
+    return {
+      label: 'Model ready',
+      detail: 'Trained and ready to predict new colors.',
+      tone: 'success',
+      ready: true,
+    };
+  }
+
+  return {
+    label: 'Ready to learn',
+    detail: 'Rate a few colors to unlock training.',
+    tone: 'neutral',
+    ready: false,
+  };
+};
+
+const getTrainingGuidance = ({ selectedCount, unselectedCount, totalSamples, canTrain, modelStats, currentDatasetSignature }) => {
+  const likedNeeded = Math.max(0, MIN_RATINGS_PER_CLASS - selectedCount);
+  const dislikedNeeded = Math.max(0, MIN_RATINGS_PER_CLASS - unselectedCount);
+
+  if (!canTrain) {
+    const missingGroups = [];
+
+    if (likedNeeded > 0) {
+      missingGroups.push(`${likedNeeded} more liked ${likedNeeded === 1 ? 'color' : 'colors'}`);
+    }
+
+    if (dislikedNeeded > 0) {
+      missingGroups.push(`${dislikedNeeded} more disliked ${dislikedNeeded === 1 ? 'color' : 'colors'}`);
+    }
+
+    return {
+      tone: 'neutral',
+      title: 'More examples needed',
+      detail: `Add ${missingGroups.join(' and ')} to unlock training. In this app, training unlocks once you have at least ${getTrainingUnlockLabel()}.`,
+    };
+  }
+
+  if (!modelStats.lastTrained) {
+    return {
+      tone: 'accent',
+      title: 'Ready for a first training run',
+      detail: `You can train now with ${totalSamples} rated colors. That is enough for a first pass, and more varied ratings usually make future predictions steadier.`,
+    };
+  }
+
+  if (!modelStats.trainedDatasetSignature) {
+    return {
+      tone: 'accent',
+      title: 'Retraining recommended',
+      detail: 'This saved model was trained before rating-change tracking was available. Train again to sync it with your current liked and disliked colors.',
+    };
+  }
+
+  if (modelStats.trainedDatasetSignature !== currentDatasetSignature) {
+    return {
+      tone: 'accent',
+      title: 'Ratings changed since training',
+      detail: 'Your rated colors changed since the last training run. Retrain to include the latest labels and examples.',
+    };
+  }
+
+  return {
+    tone: 'neutral',
+    title: 'Model is up to date',
+    detail: `This model was trained on ${modelStats.trainedSamples} rated colors. Add more varied colors and retrain whenever you want a stronger signal.`,
+  };
 };
 
 /* ═══════════════════════════════════════════════════════════════
@@ -189,22 +436,58 @@ const XIcon = (props) => (
   </SvgIcon>
 );
 
+const MonitorIcon = (props) => (
+  <SvgIcon {...props}>
+    <rect x="3" y="4" width="18" height="12" rx="2" />
+    <path d="M8 20h8" />
+    <path d="M12 16v4" />
+  </SvgIcon>
+);
+
+const SunIcon = (props) => (
+  <SvgIcon {...props}>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2v2" />
+    <path d="M12 20v2" />
+    <path d="m4.93 4.93 1.41 1.41" />
+    <path d="m17.66 17.66 1.41 1.41" />
+    <path d="M2 12h2" />
+    <path d="M20 12h2" />
+    <path d="m6.34 17.66-1.41 1.41" />
+    <path d="m19.07 4.93-1.41 1.41" />
+  </SvgIcon>
+);
+
+const MoonIcon = (props) => (
+  <SvgIcon {...props}>
+    <path d="M21 12.79A9 9 0 1 1 11.21 3c0 4.97 4.03 9 9 9 .27 0 .53-.01.79-.04Z" />
+  </SvgIcon>
+);
+
 /* ═══════════════════════════════════════════════════════════════
    Main Component
    ═══════════════════════════════════════════════════════════════ */
 export default function ColorPredictor() {
   /* ── State ──────────────────────────────────────────────────── */
-  const [status, setStatus] = useState({ isLoading: true, isTraining: false, error: null });
+  const [status, setStatus] = useState({ isLoading: true, isTraining: false, isPredicting: false, error: null });
   const [model, setModel] = useState(null);
   const [colors, setColors] = useState({ selected: [], unselected: [], current: '#6366f1' });
   const [prediction, setPrediction] = useState(null);
+  const [predictionTargetColor, setPredictionTargetColor] = useState(null);
   const [toast, setToast] = useState({ visible: false, message: '', severity: 'success' });
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [ratingHistory, setRatingHistory] = useState([]);
-  const [modelStats, setModelStats] = useState({ trainedSamples: 0, accuracy: null, lastTrained: null });
+  const [modelStats, setModelStats] = useState(getDefaultModelStats);
+  const [hasTrainedModel, setHasTrainedModel] = useState(false);
+  const [trainingProgress, setTrainingProgress] = useState({ currentEpoch: 0, totalEpochs: TRAINING_EPOCHS, accuracy: null });
+  const [showTrainingCelebration, setShowTrainingCelebration] = useState(false);
+  const [themePreference, setThemePreference] = useState('system');
 
   const toastTimerRef = useRef(null);
+  const dialogRef = useRef(null);
+  const lastFocusedElementRef = useRef(null);
+  const trainingCelebrationTimerRef = useRef(null);
 
   const selectedColors = colors.selected;
   const unselectedColors = colors.unselected;
@@ -217,10 +500,45 @@ export default function ColorPredictor() {
       selectedColors.length > 0
         ? ((selectedColors.length / (selectedColors.length + unselectedColors.length)) * 100).toFixed(1)
         : '0',
-    canTrain: selectedColors.length >= 2 && unselectedColors.length >= 2,
+    canTrain: selectedColors.length >= MIN_RATINGS_PER_CLASS && unselectedColors.length >= MIN_RATINGS_PER_CLASS,
   }), [selectedColors, unselectedColors]);
 
   const recentHistory = useMemo(() => ratingHistory.slice(-5).reverse(), [ratingHistory]);
+  const trainingProgressPercentage = useMemo(
+    () => (trainingProgress.totalEpochs > 0
+      ? Math.min(100, (trainingProgress.currentEpoch / trainingProgress.totalEpochs) * 100)
+      : 0),
+    [trainingProgress.currentEpoch, trainingProgress.totalEpochs],
+  );
+  const accuracyFeedback = useMemo(() => getAccuracyFeedback(modelStats.accuracy), [modelStats.accuracy]);
+  const predictionExplanation = useMemo(() => getPredictionExplanation(prediction), [prediction]);
+  const displayedPredictionColor = prediction?.color ?? predictionTargetColor ?? currentColor;
+  const themeButtonLabel = useMemo(() => getThemeButtonLabel(themePreference), [themePreference]);
+  const currentColorRating = useMemo(
+    () => getColorRating(selectedColors, unselectedColors, currentColor),
+    [currentColor, selectedColors, unselectedColors],
+  );
+  const currentDatasetSignature = useMemo(
+    () => createDatasetSignature(selectedColors, unselectedColors),
+    [selectedColors, unselectedColors],
+  );
+  const canTrainFromShortcut = stats.canTrain && !status.isTraining && !status.isPredicting;
+  const canPredict = hasTrainedModel && !status.isPredicting && !status.isTraining;
+  const modelStatus = useMemo(
+    () => getModelStatus({ model, status, modelStats, stats, hasTrainedModel }),
+    [hasTrainedModel, model, modelStats, stats, status],
+  );
+  const trainingGuidance = useMemo(
+    () => getTrainingGuidance({
+      selectedCount: selectedColors.length,
+      unselectedCount: unselectedColors.length,
+      totalSamples: stats.totalSamples,
+      canTrain: stats.canTrain,
+      modelStats,
+      currentDatasetSignature,
+    }),
+    [currentDatasetSignature, modelStats, selectedColors.length, stats.canTrain, stats.totalSamples, unselectedColors.length],
+  );
 
   /* ── Toast helper ───────────────────────────────────────────── */
   const showToast = useCallback((message, severity = 'success') => {
@@ -233,6 +551,7 @@ export default function ColorPredictor() {
   useEffect(() => {
     const dismissed = window.localStorage.getItem(ONBOARDING_KEY) === 'true';
     const persisted = safeParse(window.localStorage.getItem(SESSION_KEY), null);
+    const persistedThemePreference = window.localStorage.getItem(THEME_KEY);
 
     if (persisted) {
       setColors((prev) => ({
@@ -242,10 +561,13 @@ export default function ColorPredictor() {
         current: typeof persisted.current === 'string' ? persisted.current : prev.current,
       }));
       setRatingHistory(Array.isArray(persisted.ratingHistory) ? persisted.ratingHistory : []);
-      if (persisted.modelStats && typeof persisted.modelStats === 'object') {
-        setModelStats((prev) => ({ ...prev, ...persisted.modelStats }));
-      }
+      setModelStats(sanitizeModelStats(persisted.modelStats));
     }
+
+    if (persistedThemePreference === 'light' || persistedThemePreference === 'dark' || persistedThemePreference === 'system') {
+      setThemePreference(persistedThemePreference);
+    }
+
     setShowOnboarding(!dismissed);
   }, []);
 
@@ -256,6 +578,70 @@ export default function ColorPredictor() {
     );
   }, [selectedColors, unselectedColors, currentColor, ratingHistory, modelStats]);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    window.localStorage.setItem(THEME_KEY, themePreference);
+
+    if (themePreference === 'system') {
+      delete root.dataset.theme;
+      return;
+    }
+
+    root.dataset.theme = themePreference;
+  }, [themePreference]);
+
+  useEffect(() => () => {
+    window.clearTimeout(trainingCelebrationTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (status.isPredicting) return;
+    setPrediction(null);
+    setPredictionTargetColor(null);
+  }, [currentColor, status.isPredicting]);
+
+  useEffect(() => {
+    if (!showClearDialog) return;
+
+    lastFocusedElementRef.current = document.activeElement;
+
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const focusable = dialog.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    first?.focus();
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setShowClearDialog(false);
+        return;
+      }
+
+      if (event.key !== 'Tab' || focusable.length === 0) return;
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+
+    dialog.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      dialog.removeEventListener('keydown', handleKeyDown);
+      lastFocusedElementRef.current?.focus?.();
+    };
+  }, [showClearDialog]);
+
   /* ── Model init ─────────────────────────────────────────────── */
   useEffect(() => {
     (async () => {
@@ -264,12 +650,15 @@ export default function ColorPredictor() {
         try {
           const loaded = await loadModel(MODEL_ID);
           setModel(loaded);
+          setHasTrainedModel(true);
         } catch {
           const fresh = createModel({ learningRate: 0.001, dropout: 0.2 });
           setModel(fresh);
+          setHasTrainedModel(false);
         }
-      } catch {
-        setStatus((p) => ({ ...p, error: 'Failed to initialize model' }));
+      } catch (error) {
+        console.error('Model initialization error:', error);
+        setStatus((p) => ({ ...p, error: getInitializationErrorMessage() }));
       } finally {
         setStatus((p) => ({ ...p, isLoading: false }));
       }
@@ -285,15 +674,39 @@ export default function ColorPredictor() {
   const handleColorSelect = useCallback(
     (liked) => {
       const color = currentColor;
+      const existingRating = getColorRating(selectedColors, unselectedColors, color);
+      const nextRating = liked ? 'liked' : 'disliked';
+
+      if (existingRating === nextRating) {
+        showToast(`You already ${nextRating} ${color.toUpperCase()}.`, 'info');
+        return;
+      }
+
       setColors((prev) => ({
         ...prev,
-        selected: liked ? [...prev.selected, prev.current] : prev.selected,
-        unselected: liked ? prev.unselected : [...prev.unselected, prev.current],
+        selected: liked
+          ? addIfMissing(removeLastMatch(prev.selected, prev.current), prev.current)
+          : removeLastMatch(prev.selected, prev.current),
+        unselected: liked
+          ? removeLastMatch(prev.unselected, prev.current)
+          : addIfMissing(removeLastMatch(prev.unselected, prev.current), prev.current),
       }));
-      setRatingHistory((prev) => [...prev, { color, liked, timestamp: Date.now() }]);
-      showToast(liked ? 'Liked! Color sample added.' : 'Disliked! Color sample added.');
+      setRatingHistory((prev) => [...prev, {
+        color,
+        liked,
+        timestamp: Date.now(),
+        action: existingRating ? 'switch' : 'add',
+      }]);
+      showToast(
+        existingRating
+          ? `Updated rating for ${color.toUpperCase()}.`
+          : liked
+            ? 'Liked! Color sample added.'
+            : 'Disliked! Color sample added.',
+        existingRating ? 'info' : 'success',
+      );
     },
-    [currentColor, showToast],
+    [currentColor, selectedColors, showToast, unselectedColors],
   );
 
   const handleUndo = useCallback(() => {
@@ -302,26 +715,54 @@ export default function ColorPredictor() {
     setRatingHistory((prev) => prev.slice(0, -1));
     setColors((prev) => ({
       ...prev,
-      selected: last.liked ? removeLastMatch(prev.selected, last.color) : prev.selected,
-      unselected: !last.liked ? removeLastMatch(prev.unselected, last.color) : prev.unselected,
+      selected: last.action === 'switch'
+        ? last.liked
+          ? removeLastMatch(prev.selected, last.color)
+          : addIfMissing(removeLastMatch(prev.selected, last.color), last.color)
+        : last.liked
+          ? removeLastMatch(prev.selected, last.color)
+          : prev.selected,
+      unselected: last.action === 'switch'
+        ? last.liked
+          ? addIfMissing(removeLastMatch(prev.unselected, last.color), last.color)
+          : removeLastMatch(prev.unselected, last.color)
+        : !last.liked
+          ? removeLastMatch(prev.unselected, last.color)
+          : prev.unselected,
     }));
     setPrediction(null);
-    showToast(`Undid rating for ${last.color.toUpperCase()}`, 'info');
+    setPredictionTargetColor(null);
+    showToast(
+      last.action === 'switch'
+        ? `Restored previous rating for ${last.color.toUpperCase()}`
+        : `Undid rating for ${last.color.toUpperCase()}`,
+      'info',
+    );
   }, [ratingHistory, showToast]);
 
   const handleClear = useCallback(() => {
+    window.clearTimeout(trainingCelebrationTimerRef.current);
     setColors({ selected: [], unselected: [], current: '#6366f1' });
     setRatingHistory([]);
     setPrediction(null);
-    setModelStats({ trainedSamples: 0, accuracy: null, lastTrained: null });
+    setPredictionTargetColor(null);
+    setModelStats(getDefaultModelStats());
+    setShowTrainingCelebration(false);
     window.localStorage.removeItem(SESSION_KEY);
     setShowClearDialog(false);
-    showToast('Session cleared.', 'info');
-  }, [showToast]);
+    showToast(
+      hasTrainedModel
+        ? 'Session cleared. Your saved model is still stored on this device.'
+        : 'Session cleared.',
+      'info',
+    );
+  }, [hasTrainedModel, showToast]);
 
   const handleTrain = useCallback(async () => {
     if (status.isTraining || !model || !stats.canTrain) return;
     setStatus((p) => ({ ...p, isTraining: true, error: null }));
+    setTrainingProgress({ currentEpoch: 0, totalEpochs: TRAINING_EPOCHS, accuracy: null });
+    setShowTrainingCelebration(false);
     try {
       if (!model.compiled) {
         model.compile({
@@ -330,34 +771,79 @@ export default function ColorPredictor() {
           metrics: ['accuracy'],
         });
       }
-      const history = await trainModel(model, colors.selected, colors.unselected, { epochs: 50, batchSize: 32 });
+      const history = await trainModel(model, colors.selected, colors.unselected, {
+        epochs: TRAINING_EPOCHS,
+        batchSize: TRAINING_BATCH_SIZE,
+        onEpochEnd: (epoch, logs) => {
+          const rawAccuracy = logs?.accuracy ?? logs?.acc ?? null;
+          setTrainingProgress({
+            currentEpoch: epoch + 1,
+            totalEpochs: TRAINING_EPOCHS,
+            accuracy: typeof rawAccuracy === 'number' ? rawAccuracy * 100 : null,
+          });
+        },
+      });
       await saveModel(model, MODEL_ID);
 
       const accArr = history?.history?.accuracy ?? [];
       const accuracy = accArr.length > 0 ? accArr[accArr.length - 1] : 0;
-      setModelStats({ trainedSamples: stats.totalSamples, accuracy: (accuracy * 100).toFixed(1), lastTrained: new Date().toLocaleString() });
+      const formattedAccuracy = (accuracy * 100).toFixed(1);
+      const feedback = getAccuracyFeedback(formattedAccuracy);
+      setModelStats({
+        trainedSamples: stats.totalSamples,
+        accuracy: formattedAccuracy,
+        lastTrained: new Date().toLocaleString(),
+        trainedDatasetSignature: currentDatasetSignature,
+      });
+      setHasTrainedModel(true);
       setPrediction(null);
-      showToast('Model trained & saved!');
+      setPredictionTargetColor(null);
+      setShowTrainingCelebration(true);
+      window.clearTimeout(trainingCelebrationTimerRef.current);
+      trainingCelebrationTimerRef.current = window.setTimeout(() => {
+        setShowTrainingCelebration(false);
+      }, 3200);
+      showToast(feedback ? `Model trained & saved — ${feedback}.` : 'Model trained & saved!');
     } catch (error) {
       console.error('Training error:', error);
-      setStatus((p) => ({ ...p, error: `Training failed: ${error.message || 'Unknown error'}` }));
-      showToast('Training failed. Please try again.', 'error');
+      const safeMessage = getTrainingErrorMessage(error);
+      setStatus((p) => ({ ...p, error: safeMessage }));
+      showToast(safeMessage, 'error');
     } finally {
       setStatus((p) => ({ ...p, isTraining: false }));
     }
-  }, [model, colors.selected, colors.unselected, stats.canTrain, stats.totalSamples, status.isTraining, showToast]);
+  }, [currentDatasetSignature, model, colors.selected, colors.unselected, stats.canTrain, stats.totalSamples, status.isTraining, showToast]);
 
   const handlePredict = useCallback(async () => {
-    if (!model) return;
+    if (!model || status.isTraining || status.isPredicting) return;
+
+    const colorToPredict = currentColor;
+    setStatus((p) => ({ ...p, isPredicting: true, error: null }));
+    setPrediction(null);
+    setPredictionTargetColor(colorToPredict);
+
     try {
-      const result = await predictColor(model, currentColor);
-      setPrediction(result);
+      const [result] = await Promise.all([
+        Promise.resolve(predictColor(model, colorToPredict)),
+        new Promise((resolve) => window.setTimeout(resolve, 320)),
+      ]);
+
+      setPrediction({ ...result, color: colorToPredict });
       showToast('Prediction generated!');
     } catch (error) {
-      setStatus((p) => ({ ...p, error: 'Prediction failed: ' + error.message }));
-      showToast('Prediction failed.', 'error');
+      console.error('Prediction error:', error);
+      const safeMessage = getPredictionErrorMessage(error);
+      setStatus((p) => ({ ...p, error: safeMessage }));
+      setPredictionTargetColor(null);
+      showToast(safeMessage, 'error');
+    } finally {
+      setStatus((p) => ({ ...p, isPredicting: false }));
     }
-  }, [model, currentColor, showToast]);
+  }, [currentColor, model, showToast, status.isPredicting, status.isTraining]);
+
+  const handleThemeToggle = useCallback(() => {
+    setThemePreference((currentPreference) => getNextThemePreference(currentPreference));
+  }, []);
 
   /* ── Keyboard Shortcuts ─────────────────────────────────────── */
   useEffect(() => {
@@ -366,13 +852,13 @@ export default function ColorPredictor() {
       const k = e.key.toLowerCase();
       if (k === 'l') { e.preventDefault(); handleColorSelect(true); }
       else if (k === 'd') { e.preventDefault(); handleColorSelect(false); }
-      else if (k === 't' && stats.canTrain && !status.isTraining) { e.preventDefault(); handleTrain(); }
-      else if (k === 'p' && modelStats.lastTrained) { e.preventDefault(); handlePredict(); }
+      else if (k === 't' && canTrainFromShortcut) { e.preventDefault(); handleTrain(); }
+      else if (k === 'p' && canPredict) { e.preventDefault(); handlePredict(); }
       else if (k === 'u' && ratingHistory.length > 0) { e.preventDefault(); handleUndo(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [handleColorSelect, handlePredict, handleTrain, handleUndo, modelStats.lastTrained, ratingHistory.length, stats.canTrain, status.isTraining]);
+  }, [canPredict, canTrainFromShortcut, handleColorSelect, handlePredict, handleTrain, handleUndo, ratingHistory.length]);
 
   /* ── Loading State ──────────────────────────────────────────── */
   if (status.isLoading) {
@@ -414,7 +900,7 @@ export default function ColorPredictor() {
           <div className={s.alertInfo} role="status">
             <LightbulbIcon size={18} className={s.alertIcon} />
             <span>
-              <strong>Quick start:</strong> Rate a few colors (at least 2 liked &amp; 2 disliked), then train and predict.
+              <strong>Quick start:</strong> Rate a few colors (at least {getTrainingUnlockLabel()}), then train and predict.
             </span>
             <button
               type="button"
@@ -428,27 +914,72 @@ export default function ColorPredictor() {
         )}
 
         {/* ── Summary Bar ──────────────────────────────────────── */}
-        <div className={s.summaryCard}>
-          <div className={s.summaryChips}>
-            <span className={s.chip}>
-              <BarChartIcon size={14} className={s.chipIconInline} />
-              {stats.totalSamples} samples
-            </span>
-            <span className={modelStats.lastTrained ? s.chipSuccess : s.chip}>
-              {modelStats.lastTrained
-                ? <><CheckCircleIcon size={14} className={s.chipIconInline} /> Trained</>
-                : <><CircleIcon size={14} className={s.chipIconInline} /> Not trained</>
-              }
-            </span>
-            {prediction && (
-              <span className={prediction.prediction === 'like' ? s.chipSuccess : s.chipDanger}>
-                {prediction.prediction === 'like'
-                  ? <><HeartIcon size={14} className={s.chipIconInline} /> Like</>
-                  : <><XCircleIcon size={14} className={s.chipIconInline} /> Dislike</>
-                }
+        <section className={s.summaryCard} aria-labelledby="summary-title">
+          <div className={s.summaryContent}>
+            <div className={s.summaryStatus}>
+              <p id="summary-title" className={s.summaryLabel}>Model status</p>
+              <p className={s.summaryTitle}>
+                {modelStatus.ready
+                  ? <><CheckCircleIcon size={16} className={s.chipIconInline} /> {modelStatus.label}</>
+                  : <><CircleIcon size={16} className={s.chipIconInline} /> {modelStatus.label}</>}
+              </p>
+              <p className={s.summaryDescription}>{modelStatus.detail}</p>
+            </div>
+
+            <div className={s.summaryChips} role="list" aria-label="Session summary">
+              <span className={s.chip}>
+                <BarChartIcon size={14} className={s.chipIconInline} />
+                {stats.totalSamples} samples
               </span>
-            )}
+              <span className={modelStatus.tone === 'success' ? s.chipSuccess : modelStatus.tone === 'danger' ? s.chipDanger : modelStatus.tone === 'accent' ? s.chipAccent : s.chip}>
+                {modelStatus.ready
+                  ? <><CheckCircleIcon size={14} className={s.chipIconInline} /> {modelStatus.label}</>
+                  : <><CircleIcon size={14} className={s.chipIconInline} /> {modelStatus.label}</>}
+              </span>
+              {prediction && (
+                <span className={prediction.prediction === 'like' ? s.chipSuccess : s.chipDanger}>
+                  {prediction.prediction === 'like'
+                    ? <><HeartIcon size={14} className={s.chipIconInline} /> Like</>
+                    : <><XCircleIcon size={14} className={s.chipIconInline} /> Dislike</>}
+                </span>
+              )}
+              {showTrainingCelebration && (
+                <span className={s.chipAccent}>
+                  <SparklesIcon size={14} className={s.chipIconInline} /> Freshly trained
+                </span>
+              )}
+            </div>
+
+            <details className={s.shortcutHelp}>
+              <summary className={s.shortcutHelpSummary}>Keyboard shortcuts</summary>
+              <div className={s.shortcutHelpBody}>
+                <p>Use single-key shortcuts when your cursor is not inside a text field.</p>
+                <ul className={s.shortcutHelpList}>
+                  <li><kbd className={s.kbd}>L</kbd> like the current color</li>
+                  <li><kbd className={s.kbd}>D</kbd> dislike the current color</li>
+                  <li><kbd className={s.kbd}>U</kbd> undo the last rating</li>
+                  <li><kbd className={s.kbd}>T</kbd> train the model</li>
+                  <li><kbd className={s.kbd}>P</kbd> predict for the current color</li>
+                </ul>
+              </div>
+            </details>
           </div>
+          <button
+            type="button"
+            className={s.themeToggle}
+            onClick={handleThemeToggle}
+            aria-label={`${themeButtonLabel}. Activate to switch theme mode.`}
+            title={themeButtonLabel}
+          >
+            <span className={s.themeToggleIcon} aria-hidden="true">
+              {themePreference === 'system'
+                ? <MonitorIcon size={16} />
+                : themePreference === 'light'
+                  ? <SunIcon size={16} />
+                  : <MoonIcon size={16} />}
+            </span>
+            <span className={s.themeToggleText}>{themeButtonLabel}</span>
+          </button>
           <button
             type="button"
             className={s.textBtn}
@@ -457,7 +988,7 @@ export default function ColorPredictor() {
             <TrashIcon size={16} />
             Clear
           </button>
-        </div>
+        </section>
 
         {/* ── Step 1 – Pick & Rate ─────────────────────────────── */}
         <section className={s.card} aria-labelledby="step1-title">
@@ -466,10 +997,29 @@ export default function ColorPredictor() {
             <h2 id="step1-title" className={s.stepTitle}>Choose &amp; rate a color</h2>
           </div>
 
+          <details className={s.learnMore}>
+            <summary className={s.learnMoreSummary}>What&apos;s happening in this step?</summary>
+            <div className={s.learnMoreBody}>
+              <p>
+                Every time you rate a color, you create a labeled example for the model.
+                Liked colors become positive examples, and disliked colors become negative ones.
+              </p>
+              <p>
+                The more varied your ratings are, the easier it becomes for the neural network to spot patterns in your taste.
+              </p>
+            </div>
+          </details>
+
           <ColorPicker
             currentColor={currentColor}
             onColorChange={(c) => setColors((prev) => ({ ...prev, current: c }))}
           />
+
+          {currentColorRating && (
+            <p className={s.currentRatingHint} role="status" aria-live="polite">
+              This color is already marked as <strong>{currentColorRating}</strong>. Rate it again to change its label.
+            </p>
+          )}
 
           <div className={s.buttonRow}>
             <button type="button" className={s.btnLike} onClick={() => handleColorSelect(true)}>
@@ -524,6 +1074,18 @@ export default function ColorPredictor() {
             <h2 id="step2-title" className={s.stepTitle}>Train your model</h2>
           </div>
 
+          <details className={s.learnMore}>
+            <summary className={s.learnMoreSummary}>What does training do?</summary>
+            <div className={s.learnMoreBody}>
+              <p>
+                Training runs all of your rated colors through the neural network over several rounds called epochs.
+              </p>
+              <p>
+                On each round, the model adjusts its internal weights so it can better separate colors you like from colors you do not.
+              </p>
+            </div>
+          </details>
+
           <div className={s.statsRow}>
             <span className={s.chipSuccess}>
               <ThumbUpIcon size={14} className={s.chipIconInline} />
@@ -539,15 +1101,22 @@ export default function ColorPredictor() {
             </span>
           </div>
 
-          {!stats.canTrain && (
-            <p id="train-help" style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 16 }}>
-              Rate at least <strong>2 liked</strong> and <strong>2 disliked</strong> colors to enable training.
-            </p>
-          )}
+          <div
+            id="train-guidance"
+            className={trainingGuidance.tone === 'accent' ? s.trainingGuidanceAccent : s.trainingGuidanceNeutral}
+          >
+            <LightbulbIcon size={18} className={s.trainingGuidanceIcon} />
+            <div>
+              <p className={s.trainingGuidanceTitle}>{trainingGuidance.title}</p>
+              <p className={s.trainingGuidanceText}>{trainingGuidance.detail}</p>
+            </div>
+          </div>
 
           {modelStats.lastTrained && (
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16, fontFamily: 'var(--font-mono)' }}>
+            <p className={s.trainingMeta}>
               Last trained: {modelStats.lastTrained} &middot; Accuracy: {modelStats.accuracy}%
+              {!hasTrainedModel ? ' — Saved model needs retraining on this device' : ''}
+              {accuracyFeedback ? ` — ${accuracyFeedback}` : ''}
             </p>
           )}
 
@@ -557,7 +1126,7 @@ export default function ColorPredictor() {
               className={s.btnTrain}
               onClick={handleTrain}
               disabled={!stats.canTrain || status.isTraining}
-              aria-describedby="train-help"
+              aria-describedby="train-guidance"
             >
               <BrainIcon size={18} className={s.btnIcon} />
               {status.isTraining ? 'Training\u2026' : 'Train model'}
@@ -566,10 +1135,10 @@ export default function ColorPredictor() {
               type="button"
               className={s.btnPredict}
               onClick={handlePredict}
-              disabled={!modelStats.lastTrained}
+              disabled={!canPredict}
             >
               <SparklesIcon size={18} className={s.btnIcon} />
-              Predict
+              {status.isPredicting ? 'Analyzing…' : 'Predict'}
             </button>
           </div>
 
@@ -582,9 +1151,28 @@ export default function ColorPredictor() {
           {status.isTraining && (
             <div className={s.progressWrap} aria-live="polite">
               <div className={s.progressBar}>
-                <div className={s.progressFill} style={{ width: '100%' }} />
+                <div className={s.progressFill} style={{ width: `${Math.max(4, trainingProgressPercentage)}%` }} />
               </div>
-              <p className={s.progressText}>Training in progress&hellip; this usually takes a few seconds.</p>
+              <p className={s.progressText}>
+                Epoch {Math.max(trainingProgress.currentEpoch, 1)} of {trainingProgress.totalEpochs}
+                {typeof trainingProgress.accuracy === 'number'
+                  ? ` · Current accuracy ${trainingProgress.accuracy.toFixed(1)}%`
+                  : ''}
+              </p>
+            </div>
+          )}
+
+          {showTrainingCelebration && !status.isTraining && (
+            <div className={s.trainingCelebration} role="status" aria-live="polite">
+              <SparklesIcon size={18} className={s.trainingCelebrationIcon} />
+              <div>
+                <p className={s.trainingCelebrationTitle}>Your model just learned from {stats.totalSamples} rated colors.</p>
+                <p className={s.trainingCelebrationText}>
+                  {accuracyFeedback
+                    ? `${accuracyFeedback}. Try a prediction or rate more colors to improve it further.`
+                    : 'Try a prediction or rate more colors to improve it further.'}
+                </p>
+              </div>
             </div>
           )}
 
@@ -592,31 +1180,63 @@ export default function ColorPredictor() {
         </section>
 
         {/* ── Step 3 – Prediction ──────────────────────────────── */}
-        {prediction && (
+        {(status.isPredicting || prediction) && (
           <section className={s.predictionCard} aria-labelledby="step3-title">
             <div className={s.stepHeader}>
               <span className={s.stepBadge} aria-hidden="true">3</span>
-              <h2 id="step3-title" className={s.stepTitle}>Prediction result</h2>
+              <h2 id="step3-title" className={s.stepTitle}>{status.isPredicting ? 'Analyzing color' : 'Prediction result'}</h2>
             </div>
-            <div className={s.predictionInner}>
-              <div className={s.predictionSwatch} style={{ backgroundColor: currentColor }} />
-              <div className={s.predictionBody}>
-                <p className={s.predictionVerdict}>
-                  {prediction.prediction === 'like' ? (
-                    <><CheckCircleIcon size={18} className={s.verdictIcon} /> This color matches your taste!</>
-                  ) : (
-                    <><XCircleIcon size={18} className={s.verdictIcon} /> This color probably isn&apos;t for you.</>
-                  )}
-                </p>
-                <p className={s.predictionMeta}>
-                  Confidence: {(prediction.confidence * 100).toFixed(1)}% &middot; Score: {(prediction.score * 100).toFixed(1)}%
-                </p>
-                <div className={s.confidenceBar}>
-                  <div
-                    className={prediction.prediction === 'like' ? s.confidenceFillLike : s.confidenceFillDislike}
-                    style={{ width: `${Math.max(4, prediction.confidence * 100)}%` }}
-                  />
+
+            {!status.isPredicting && (
+              <details className={s.learnMore}>
+                <summary className={s.learnMoreSummary}>How should I read this prediction?</summary>
+                <div className={s.learnMoreBody}>
+                  <p>
+                    The model converts the current color into red, green, and blue numbers, then estimates whether that pattern matches your past ratings.
+                  </p>
+                  <p>
+                    Confidence tells you how sure the model feels about this guess. If the confidence is low, rate more colors and train again.
+                  </p>
                 </div>
+              </details>
+            )}
+
+            <div className={s.predictionInner}>
+              <div className={s.predictionSwatch} style={{ backgroundColor: displayedPredictionColor }} />
+              <div className={s.predictionBody}>
+                {status.isPredicting ? (
+                  <>
+                    <p className={s.predictionVerdict}>Analyzing this color…</p>
+                    <p className={s.predictionMeta}>
+                      The model is comparing this shade with the colors you rated before.
+                    </p>
+                    <div className={s.predictionLoadingBar} aria-hidden="true">
+                      <div className={s.predictionLoadingFill} />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className={s.predictionVerdict}>
+                      {prediction.prediction === 'like' ? (
+                        <><CheckCircleIcon size={18} className={s.verdictIcon} /> This color matches your taste!</>
+                      ) : (
+                        <><XCircleIcon size={18} className={s.verdictIcon} /> This color probably isn&apos;t for you.</>
+                      )}
+                    </p>
+                    <p className={s.predictionMeta}>
+                      {predictionExplanation}
+                    </p>
+                    <p className={s.predictionStats}>
+                      Confidence: {(prediction.confidence * 100).toFixed(1)}% &middot; Model score: {(prediction.score * 100).toFixed(1)}%
+                    </p>
+                    <div className={s.confidenceBar}>
+                      <div
+                        className={prediction.prediction === 'like' ? s.confidenceFillLike : s.confidenceFillDislike}
+                        style={{ width: `${Math.max(4, prediction.confidence * 100)}%` }}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </section>
@@ -632,28 +1252,23 @@ export default function ColorPredictor() {
         {/* ── SR Live Region ───────────────────────────────────── */}
         <div aria-live="polite" role="status" className={s.srOnly}>
           {status.isTraining ? 'Model training in progress' : 'Model training idle'}
+          {status.isPredicting ? ' Generating prediction for the current color.' : ''}
+          {prediction
+            ? ` Prediction: the model thinks you would ${prediction.prediction} this color with ${(prediction.confidence * 100).toFixed(0)} percent confidence.`
+            : ''}
         </div>
 
         {/* ── Toast ────────────────────────────────────────────── */}
         <div
-          className={toast.visible ? s.toastVisible : s.toast}
+          className={`${toast.visible ? s.toastVisible : s.toast} ${
+            toast.severity === 'success' ? s.toastSuccess
+              : toast.severity === 'error' ? s.toastError
+              : s.toastInfo
+          }`}
           role="status"
           aria-live="polite"
         >
-          <span
-            className={
-              toast.severity === 'success' ? s.toastSuccess
-                : toast.severity === 'error' ? s.toastError
-                : s.toastInfo
-            }
-            style={{
-              display: 'inline-block',
-              padding: '12px 24px',
-              borderRadius: 'var(--radius-md)',
-            }}
-          >
-            {toast.message}
-          </span>
+          {toast.message}
         </div>
 
         {/* ── Clear Confirmation Dialog ────────────────────────── */}
@@ -666,11 +1281,11 @@ export default function ColorPredictor() {
             aria-labelledby="clear-dialog-title"
             aria-describedby="clear-dialog-desc"
           >
-            <div className={s.dialog}>
+            <div className={s.dialog} ref={dialogRef}>
               <h3 id="clear-dialog-title" className={s.dialogTitle}>Clear session?</h3>
               <p id="clear-dialog-desc" className={s.dialogBody}>
                 This will remove all color ratings, history, prediction output, and training stats.
-                Your trained model will remain saved.
+                Any saved model stays stored on this device unless you remove your browser data.
               </p>
               <div className={s.dialogActions}>
                 <button

@@ -148,9 +148,21 @@
 }
 
 .hexInputField:focus {
-  outline: none;
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.hexInputFieldError {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-glow);
+}
+
+.hexInputFieldError:focus {
+  outline-color: var(--danger);
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-glow);
 }
 
 /* ── Random Button ──────────────────────────────────────────── */
@@ -189,6 +201,14 @@
 .helper {
   font-size: 13px;
   color: var(--text-faint);
+  text-align: center;
+  max-width: 280px;
+}
+
+.errorText {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--danger-text);
   text-align: center;
   max-width: 280px;
 }
