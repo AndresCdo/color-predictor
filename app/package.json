@@ -10,13 +10,13 @@
   },
   "dependencies": {
     "@tensorflow/tfjs": "^4.22.0",
-    "next": "15.4.8",
+    "next": "15.5.14",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3",
-    "eslint": "^9",
-    "eslint-config-next": "15.1.6"
+    "@eslint/eslintrc": "^3.3.5",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "15.5.14"
   }
 }
