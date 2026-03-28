@@ -148,12 +148,12 @@ export const trainModel = async (
       mode: 'min'
     });
 
-    const callbacks = [earlyStoppingCallback];
-    if (typeof onEpochEnd === 'function') {
-      callbacks.push(tf.customCallback({
-        onEpochEnd,
-      }));
-    }
+    const callbacks = typeof onEpochEnd === 'function'
+      ? {
+          onEpochEnd,
+          callbacks: [earlyStoppingCallback],
+        }
+      : [earlyStoppingCallback];
     
     const history = await model.fit(tensors.xs, tensors.ys, {
       epochs,
