@@ -595,10 +595,10 @@ export default function ColorPredictor() {
   }, []);
 
   useEffect(() => {
-    if (status.isPredicting) return;
+    if (status.isPredicting || !predictionTargetColor || currentColor === predictionTargetColor) return;
     setPrediction(null);
     setPredictionTargetColor(null);
-  }, [currentColor, status.isPredicting]);
+  }, [currentColor, predictionTargetColor, status.isPredicting]);
 
   useEffect(() => {
     if (!showClearDialog) return;
