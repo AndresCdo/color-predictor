@@ -150,7 +150,9 @@ export const trainModel = async (
 
     const callbacks = [earlyStoppingCallback];
     if (typeof onEpochEnd === 'function') {
-      callbacks.push({ onEpochEnd });
+      callbacks.push(tf.customCallback({
+        onEpochEnd,
+      }));
     }
     
     const history = await model.fit(tensors.xs, tensors.ys, {
