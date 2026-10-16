@@ -1,0 +1,12 @@
+**
+!Dockerfile
+!conf/
+!conf/default.conf
+!app/
+!app/package.json
+!app/package-lock.json
+!app/next.config.mjs
+!app/jsconfig.json
+!app/.eslintrc.json
+!app/src/
+!app/src/**

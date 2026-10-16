@@ -18,9 +18,14 @@ const getContrastTextColor = (hexColor) => {
   const g = parseInt(expanded.slice(2, 4), 16);
   const b = parseInt(expanded.slice(4, 6), 16);
 
-  // WCAG relative luminance
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.55 ? '#0f172a' : '#f8fafc';
+  // Linearize sRGB before computing WCAG relative luminance. Choosing the
+  // higher-contrast black/white pair guarantees at least 4.5:1 on any color.
+  const [red, green, blue] = [r, g, b].map((channel) => {
+    const value = channel / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  return (luminance + 0.05) / 0.05 >= 1.05 / (luminance + 0.05) ? '#000000' : '#ffffff';
 };
 
 /** Generates a random hex color. */
@@ -47,6 +52,7 @@ const normalizeHexInput = (value) => {
 const ColorPicker = ({ currentColor, onColorChange }) => {
   const [hexDraft, setHexDraft] = useState(currentColor.toUpperCase());
   const [hexError, setHexError] = useState('');
+  const [previousColor, setPreviousColor] = useState(currentColor);
   const nativeInputRef = useRef(null);
   const textColor = getContrastTextColor(currentColor);
   const displayHex = currentColor.toUpperCase();
@@ -121,9 +127,11 @@ const ColorPicker = ({ currentColor, onColorChange }) => {
     setHexError('');
   }, [onColorChange]);
 
-  // Keep text input in sync when parent changes colour via keyboard shortcuts etc.
-  if (hexDraft !== displayHex && HEX_REGEX.test(hexDraft)) {
-    // Only sync outward if the user isn't actively typing something new
+  // Only an actual committed color change resets a draft, never typing alone.
+  if (previousColor !== currentColor) {
+    setPreviousColor(currentColor);
+    setHexDraft(displayHex);
+    setHexError('');
   }
 
   return (

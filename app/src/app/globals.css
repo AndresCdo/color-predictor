@@ -5,30 +5,33 @@
 /* ── Design Tokens ──────────────────────────────────────────── */
 :root {
   /* Palette */
-  --bg: #f0f2f8;
+  --bg: #f6f6f4;
   --bg-gradient-start: #e8ecf6;
   --bg-gradient-end: #f5f0fa;
-  --surface: rgba(255, 255, 255, 0.72);
+  --surface: #ffffff;
   --surface-solid: #ffffff;
   --surface-hover: rgba(255, 255, 255, 0.92);
   --text: #0f172a;
-  --text-muted: #64748b;
+  --text-muted: #536174;
   --text-faint: #6b7280;
   --border: rgba(148, 163, 184, 0.22);
   --border-hover: rgba(99, 102, 241, 0.35);
   --focus: #6366f1;
-  --accent: #6366f1;
+  --accent: #4338ca;
   --accent-light: #818cf8;
   --accent-glow: rgba(99, 102, 241, 0.18);
-  --success: #10b981;
+  --success: #047857;
   --success-text: #047857;
   --success-light: #d1fae5;
   --success-glow: rgba(16, 185, 129, 0.15);
-  --danger: #ef4444;
+  --danger: #b91c1c;
   --danger-text: #b91c1c;
   --danger-light: #fee2e2;
   --danger-glow: rgba(239, 68, 68, 0.12);
   --warning: #f59e0b;
+  --on-accent: #ffffff;
+  --on-success: #ffffff;
+  --on-danger: #ffffff;
 
   /* Elevation */
   --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
@@ -67,19 +70,19 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --bg: #080c18;
+    --bg: #101318;
     --bg-gradient-start: #0a0f1e;
     --bg-gradient-end: #120b1e;
-    --surface: rgba(17, 24, 50, 0.72);
-    --surface-solid: #111832;
+    --surface: #1b2028;
+    --surface-solid: #1b2028;
     --surface-hover: rgba(17, 24, 50, 0.92);
     --text: #e8ecf4;
-    --text-muted: #94a3b8;
+    --text-muted: #b4bfce;
     --text-faint: #9ca3af;
     --border: rgba(99, 102, 241, 0.12);
     --border-hover: rgba(99, 102, 241, 0.35);
     --focus: #818cf8;
-    --accent: #818cf8;
+    --accent: #a5b4fc;
     --accent-light: #a5b4fc;
     --accent-glow: rgba(129, 140, 248, 0.20);
     --success: #34d399;
@@ -91,6 +94,9 @@
     --danger-light: rgba(239, 68, 68, 0.12);
     --danger-glow: rgba(248, 113, 113, 0.15);
     --warning: #fbbf24;
+  --on-accent: #111827;
+  --on-success: #06281c;
+  --on-danger: #300909;
 
     --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
     --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
@@ -101,19 +107,19 @@
 }
 
 :root[data-theme='dark'] {
-  --bg: #080c18;
+  --bg: #101318;
   --bg-gradient-start: #0a0f1e;
   --bg-gradient-end: #120b1e;
-  --surface: rgba(17, 24, 50, 0.72);
-  --surface-solid: #111832;
+  --surface: #1b2028;
+  --surface-solid: #1b2028;
   --surface-hover: rgba(17, 24, 50, 0.92);
   --text: #e8ecf4;
-  --text-muted: #94a3b8;
+  --text-muted: #b4bfce;
   --text-faint: #9ca3af;
   --border: rgba(99, 102, 241, 0.12);
   --border-hover: rgba(99, 102, 241, 0.35);
   --focus: #818cf8;
-  --accent: #818cf8;
+  --accent: #a5b4fc;
   --accent-light: #a5b4fc;
   --accent-glow: rgba(129, 140, 248, 0.20);
   --success: #34d399;
@@ -125,6 +131,9 @@
   --danger-light: rgba(239, 68, 68, 0.12);
   --danger-glow: rgba(248, 113, 113, 0.15);
   --warning: #fbbf24;
+  --on-accent: #111827;
+  --on-success: #06281c;
+  --on-danger: #300909;
 
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
@@ -163,48 +172,13 @@ body {
   position: relative;
 }
 
-/* ── Ambient Background ─────────────────────────────────────── */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 80% 50% at 20% 20%, rgba(99, 102, 241, 0.08), transparent 60%),
-    radial-gradient(ellipse 60% 60% at 80% 70%, rgba(168, 85, 247, 0.06), transparent 60%),
-    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(236, 72, 153, 0.04), transparent 60%),
-    linear-gradient(145deg, var(--bg-gradient-start), var(--bg-gradient-end));
-  z-index: -1;
-  pointer-events: none;
-}
-
-/* Subtle animated floating orbs */
-body::after {
-  content: '';
-  position: fixed;
-  width: 600px;
-  height: 600px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.06) 0%, transparent 70%);
-  top: -100px;
-  right: -200px;
-  z-index: -1;
-  pointer-events: none;
-  animation: float-orb 20s ease-in-out infinite;
-}
-
-@keyframes float-orb {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(-80px, 60px) scale(1.1); }
-  66% { transform: translate(40px, -40px) scale(0.95); }
-}
-
 /* ── Skip Link (Accessibility) ──────────────────────────────── */
 .skip-link {
   position: absolute;
   left: var(--space-md);
   top: -60px;
   background: var(--accent);
-  color: #ffffff;
+  color: var(--on-accent);
   padding: var(--space-sm) var(--space-md);
   border-radius: var(--radius-sm);
   z-index: 9999;

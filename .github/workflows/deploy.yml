@@ -3,18 +3,18 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [master]
+  pull_request:
+    branches: [master]
   # Allow manual triggering from the Actions tab
   workflow_dispatch:
 
-# Grant GITHUB_TOKEN the permissions needed to deploy to Pages
+# Build jobs only need read access; deployment permissions are scoped below.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
-# Only one deployment at a time; cancel in-progress runs on new pushes
+# Separate PR checks from master deployments and cancel stale runs.
 concurrency:
-  group: pages
+  group: pages-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -29,7 +29,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: app/package-lock.json
 
@@ -38,10 +38,22 @@ jobs:
         working-directory: app
 
       - name: Build (static export)
-        run: npm run build
+        run: npm run lint && npm test && npm run build
         working-directory: app
 
+      - name: Audit production dependencies
+        run: npm audit --omit=dev
+        working-directory: app
+
+      - name: Build and smoke-test container
+        run: |
+          docker build -t color-predictor-check .
+          docker run -d --name color-predictor-check -p 127.0.0.1:3000:3000 color-predictor-check
+          trap 'docker rm -f color-predictor-check' EXIT
+          curl --fail --retry 10 --retry-connrefused --retry-delay 1 http://127.0.0.1:3000/color-predictor/
+
       - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
           # next build with `output: 'export'` writes to app/out/
@@ -50,7 +62,11 @@ jobs:
   # ── Deploy ───────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy to GitHub Pages
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     needs: build
+    permissions:
+      pages: write
+      id-token: write
     runs-on: ubuntu-latest
     environment:
       name: github-pages
