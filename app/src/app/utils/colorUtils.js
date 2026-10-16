@@ -1,4 +1,4 @@
-import * as tf from '@tensorflow/tfjs';
+import * as tf from './tensorflow.js';
 
 /**
  * Validates and converts a hex color string to RGB values normalized between 0 and 1.
@@ -76,14 +76,24 @@ export const createModel = ({ learningRate = 0.001, dropout = 0.2 } = {}) => {
   return model;
 };
 
+/** Releases model weights and the explicitly-created optimizer's tensors. */
+export const disposeModel = (model) => {
+  model?.optimizer?.dispose();
+  model?.dispose();
+};
+
 /**
  * Preprocesses and validates color data before training.
  * @param {string[]} selectedColors - Array of liked color hex strings.
  * @param {string[]} unselectedColors - Array of disliked color hex strings.
- * @returns {Object} Processed tensors and metadata.
+ * @param {number} validationSplit - Fraction held out independently from each class.
+ * @returns {Object} Training tensors and optional validation tensors.
  * @throws {Error} If input data is invalid.
  */
-const preprocessData = (selectedColors, unselectedColors) => {
+const preprocessData = (selectedColors, unselectedColors, validationSplit) => {
+  if (!Number.isFinite(validationSplit) || validationSplit < 0 || validationSplit >= 1) {
+    throw new Error('validationSplit must be between 0 (inclusive) and 1 (exclusive)');
+  }
   if (!Array.isArray(selectedColors) || !Array.isArray(unselectedColors)) {
     throw new Error('Color arrays must be provided');
   }
@@ -103,17 +113,27 @@ const preprocessData = (selectedColors, unselectedColors) => {
     throw new Error('No valid colors found after processing');
   }
   
-  return {
-    xs: tf.tensor2d([...processedSelected, ...processedUnselected]),
-    ys: tf.tensor2d(
-      [
-        ...Array(processedSelected.length).fill(1),
-        ...Array(processedUnselected.length).fill(0)
-      ],
-      [processedSelected.length + processedUnselected.length, 1]
-    ),
-    totalSamples: processedSelected.length + processedUnselected.length
-  };
+  // Split each class before fitting. fit's validationSplit takes the tail
+  // before shuffling, which would otherwise validate only disliked colors.
+  // At the default 20%, fewer than five examples per class use training only.
+  const useValidation = [processedSelected, processedUnselected]
+    .every((items) => Math.floor(items.length * validationSplit) >= 1);
+  const training = [];
+  const validation = [];
+  [processedSelected, processedUnselected].forEach((items, index) => {
+    tf.util.shuffle(items);
+    const count = useValidation ? Math.min(items.length - 1, Math.floor(items.length * validationSplit)) : 0;
+    items.forEach((rgb, i) => {
+      (i < count ? validation : training).push({ rgb, label: index === 0 ? 1 : 0 });
+    });
+  });
+
+  return tf.tidy(() => ({
+    xs: tf.tensor2d(training.map((item) => item.rgb)),
+    ys: tf.tensor2d(training.map((item) => [item.label])),
+    validationXs: useValidation ? tf.tensor2d(validation.map((item) => item.rgb)) : null,
+    validationYs: useValidation ? tf.tensor2d(validation.map((item) => [item.label])) : null,
+  }));
 };
 
 /**
@@ -124,9 +144,9 @@ const preprocessData = (selectedColors, unselectedColors) => {
  * @param {Object} config - Training configuration options.
  * @param {number} [config.epochs=50] - Number of training epochs.
  * @param {number} [config.batchSize=32] - Batch size for training.
- * @param {number} [config.validationSplit=0.2] - Fraction of data to use for validation.
+ * @param {number} [config.validationSplit=0.2] - Per-class holdout fraction, used only when both classes can contribute a sample.
  * @param {(epoch: number, logs?: tf.Logs) => void} [config.onEpochEnd] - Optional callback fired after each epoch.
- * @returns {Promise<tf.History>} A promise that resolves with the training history.
+ * @returns {Promise<tf.History>} Training history with trainingSamples and validationSamples counts.
  * @throws {Error} If training fails or input data is invalid.
  */
 export const trainModel = async (
@@ -138,32 +158,32 @@ export const trainModel = async (
   let tensors;
   
   try {
-    tensors = preprocessData(selectedColors, unselectedColors);
+    tensors = preprocessData(selectedColors, unselectedColors, validationSplit);
     
     // Early stopping callback
     const earlyStoppingCallback = tf.callbacks.earlyStopping({
-      monitor: 'val_loss',
+      monitor: tensors.validationXs ? 'val_loss' : 'loss',
       minDelta: 0.001,
       patience: 5,
       mode: 'min'
     });
 
-    const callbacks = typeof onEpochEnd === 'function'
-      ? {
-          onEpochEnd,
-          callbacks: [earlyStoppingCallback],
-        }
-      : [earlyStoppingCallback];
+    const callbacks = [earlyStoppingCallback];
+    if (typeof onEpochEnd === 'function') {
+      callbacks.push(new tf.CustomCallback({ onEpochEnd }));
+    }
     
     const history = await model.fit(tensors.xs, tensors.ys, {
       epochs,
       batchSize,
-      validationSplit,
+      validationData: tensors.validationXs ? [tensors.validationXs, tensors.validationYs] : undefined,
       shuffle: true,
       callbacks,
       verbose: 1
     });
     
+    history.trainingSamples = tensors.xs.shape[0];
+    history.validationSamples = tensors.validationXs?.shape[0] ?? 0;
     return history;
   } catch (error) {
     throw new Error(`Training failed: ${error.message}`);
@@ -172,12 +192,14 @@ export const trainModel = async (
     if (tensors) {
       tensors.xs.dispose();
       tensors.ys.dispose();
+      tensors.validationXs?.dispose();
+      tensors.validationYs?.dispose();
     }
   }
 };
 
 /**
- * Predicts the likelihood of liking a color using the trained model with confidence score.
+ * Predicts a color preference with uncalibrated signal strength in the legacy confidence field.
  * @param {tf.Sequential} model - The trained TensorFlow.js model.
  * @param {string} color - The hex color string to predict.
  * @returns {Object} The prediction result with confidence score.
@@ -196,7 +218,7 @@ export const predictColor = (model, color) => {
     prediction = model.predict(input);
     const score = prediction.dataSync()[0];
     
-    // Calculate confidence based on distance from decision boundary
+    // Distance from the decision boundary, not calibrated probability of correctness.
     const confidence = Math.abs(score - 0.5) * 2; // Scale to 0-1
     
     return {

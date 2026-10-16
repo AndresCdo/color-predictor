@@ -5,22 +5,25 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node --experimental-default-type=module --test src/app/utils/*.test.js"
   },
   "dependencies": {
-    "@tensorflow/tfjs": "^4.22.0",
-    "next": "15.5.23",
+    "@tensorflow/tfjs-backend-cpu": "4.22.0",
+    "@tensorflow/tfjs-backend-webgl": "4.22.0",
+    "@tensorflow/tfjs-core": "4.22.0",
+    "@tensorflow/tfjs-layers": "4.22.0",
+    "next": "15.5.27",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
     "eslint": "^9.39.4",
-    "eslint-config-next": "15.5.23"
+    "eslint-config-next": "15.5.27"
   },
   "overrides": {
     "postcss": "^8.5.26",
-    "sharp": "^0.35.3"
+    "sharp": "^0.35.4"
   }
 }
